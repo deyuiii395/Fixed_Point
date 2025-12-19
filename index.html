@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>从不动点到混沌：数列迭代的数学图景</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --neon-green: #0aff00;
+            --bg-dark: #0a0a12;
+            --card-bg: rgba(20, 20, 35, 0.85);
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a12; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+        /* 霓虹特效 */
+        .neon-text { text-shadow: 0 0 5px rgba(0, 243, 255, 0.5); }
+        
+        /* 玻璃拟态卡片 */
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            border-color: rgba(255,255,255,0.2);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+        }
+
+        /* 数学公式容器美化 */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 1rem;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            border-left: 3px solid var(--neon-purple);
+            margin: 1rem 0;
+        }
+        
+        /* 行内公式微调 */
+        .katex { font-size: 1.1em; }
+
+        /* 交互画布 */
+        canvas { background: #000; border-radius: 8px; cursor: crosshair; }
+
+        /* 导航激活 */
+        .nav-item.active { color: var(--neon-blue); border-bottom: 2px solid var(--neon-blue); }
+
+        /* 动画类 */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="min-h-screen flex flex-col">
+    <nav class="fixed top-0 w-full z-50 glass-card !rounded-none border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0 font-bold text-xl neon-text tracking-wider text-cyan-400">
+                    CHAOS.MATH
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <button v-for="(section, index) in sections" :key="index" 
+                            @click="scrollTo(index)"
+                            :class="['nav-item px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200', activeSection === index ? 'text-cyan-400' : 'text-gray-300 hover:text-white']">
+                            {{ section.title }}
+                        </button>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-gray-300 p-2">☰</button>
+                </div>
+            </div>
+        </div>
+        <div v-if="mobileMenuOpen" class="md:hidden bg-gray-900 border-b border-gray-800">
+            <button v-for="(section, index) in sections" :key="index" 
+                @click="scrollTo(index); mobileMenuOpen = false"
+                class="block w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-gray-800">
+                {{ section.title }}
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
+        
+        <header class="text-center py-12 relative mb-8">
+            <h1 class="text-4xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 mb-6 drop-shadow-lg">
+                从不动点到混沌
+            </h1>
+            <p class="text-xl text-gray-400 tracking-wide">数列迭代的数学图景 · 公开课专题可视化</p>
+        </header>
+
+        <div class="space-y-20">
+
+            <section id="section-0" class="glass-card p-6 sm:p-8">
+                <h2 class="text-2xl font-bold mb-6 border-l-4 border-cyan-400 pl-4 text-white">理论基础：压缩映射与不动点</h2>
+                <div class="text-gray-300 space-y-4 text-lg">
+                    <p>在高中，我们常令 $a_{n+1} = a_n = x$ 来求极限，这背后的依据是什么？</p>
+                    
+                    <div class="bg-gray-800/50 p-6 rounded-xl border border-gray-700 mt-4">
+                        <h3 class="font-bold text-cyan-300 text-xl mb-3">不动点 (Fixed Point)</h3>
+                        <p class="mb-4">对于函数 $f(x)$，如果存在 $x^*$ 使得：</p>
+                        <div class="text-center">$$ f(x^*) = x^* $$</div>
+                        <p class="mt-4">在几何上，这是函数图像 $y=f(x)$ 与直线 $y=x$ 的交点。</p>
+                    </div>
+
+                    <div class="grid md:grid-cols-3 gap-4 mt-6 text-sm">
+                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                            <strong class="text-green-400 block mb-2">单调收敛</strong>
+                            $0 < f'(x) < 1$<br>像下台阶一样逼近。
+                        </div>
+                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                            <strong class="text-purple-400 block mb-2">螺旋收敛</strong>
+                            $-1 < f'(x) < 0$<br>围绕不动点震荡逼近。
+                        </div>
+                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                            <strong class="text-red-400 block mb-2">发散/混沌</strong>
+                            $|f'(x)| > 1$<br>轨迹被甩出，远离不动点。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-1" class="glass-card p-6 sm:p-8 border border-cyan-500/30">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-bold border-l-4 border-purple-500 pl-4 text-white">几何直观：蛛网模型</h2>
+                    <span class="px-3 py-1 bg-purple-900/80 text-purple-100 text-sm font-bold rounded-full border border-purple-500 animate-pulse">
+                        Interactive Lab
+                    </span>
+                </div>
+                
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="bg-gray-800/60 p-4 rounded-xl border border-gray-700">
+                            <label class="text-sm font-semibold text-gray-300 block mb-2">选择迭代模型</label>
+                            <select v-model="cobwebConfig.type" @change="resetCobweb" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                <option value="logistic">Logistic 映射 (二次)</option>
+                                <option value="linear">线性递推 (ax + b)</option>
+                                <option value="newton">牛顿迭代 (√k)</option>
+                            </select>
+                        </div>
+
+                        <div v-if="cobwebConfig.type === 'logistic'" class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-400">参数 $\mu$</span>
+                                <span class="text-cyan-400 font-mono">{{ cobwebConfig.r }}</span>
+                            </div>
+                            <input type="range" min="0" max="4" step="0.01" v-model.number="cobwebConfig.r" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                        </div>
+
+                        <div v-if="cobwebConfig.type === 'linear'" class="space-y-2">
+                             <div class="flex justify-between text-sm">
+                                <span class="text-gray-400">斜率 $A$</span>
+                                <span class="text-cyan-400 font-mono">{{ cobwebConfig.a }}</span>
+                            </div>
+                            <input type="range" min="-2" max="2" step="0.1" v-model.number="cobwebConfig.a" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                        </div>
+                        
+                        <div class="space-y-2">
+                             <div class="flex justify-between text-sm">
+                                <span class="text-gray-400">初值 $x_0$</span>
+                                <span class="text-purple-400 font-mono">{{ cobwebConfig.x0 }}</span>
+                            </div>
+                            <input type="range" :min="cobwebConfig.type==='newton'?0.1:0" :max="cobwebConfig.type==='newton'?5:1" step="0.01" v-model.number="cobwebConfig.x0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
+                        </div>
+                        
+                        <div class="p-4 bg-gray-900 rounded-lg text-xs text-gray-400 border border-gray-800 leading-relaxed">
+                            <p class="mb-2"><strong class="text-white">观察指南：</strong></p>
+                            <p>1. 拖动 $x_0$ 改变起点。</p>
+                            <p>2. 在 Logistic 模式下，当 $\mu > 3.0$ 时出现分叉，当 $\mu > 3.57$ 时进入<span class="text-red-400 font-bold">混沌</span>。</p>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-black rounded-xl relative overflow-hidden h-[400px] border border-gray-700 shadow-inner">
+                        <canvas ref="cobwebCanvas" width="800" height="500" class="w-full h-full object-contain"></canvas>
+                        <div class="absolute top-4 right-4 text-xs font-mono text-gray-500">Iterations: 60</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-2" class="glass-card p-6 sm:p-8">
+                <h2 class="text-2xl font-bold mb-8 border-l-4 border-green-500 pl-4 text-white">典例精讲：分步探究</h2>
+
+                <div class="space-y-8">
+                    <div v-for="(ex, index) in examples" :key="index" class="bg-gray-800/40 rounded-xl border border-gray-700 overflow-hidden transition hover:border-gray-600">
+                        <div class="p-6 bg-gray-800/80 border-b border-gray-700 relative">
+                            <div class="absolute top-0 right-0 px-4 py-1 text-xs font-bold rounded-bl-xl shadow-lg" :class="ex.badgeClass">
+                                {{ ex.badge }}
+                            </div>
+                            <h3 class="font-bold text-xl text-white mb-3">{{ ex.title }}</h3>
+                            <div class="text-gray-200 text-lg leading-relaxed render-math-content" v-html="ex.problem"></div>
+                        </div>
+
+                        <div class="p-4 sm:p-6 space-y-4">
+                            <div v-for="(step, sIdx) in ex.steps" :key="sIdx">
+                                <button @click="toggleStep(step)" 
+                                    class="flex items-center w-full text-left font-medium transition-all duration-200 group p-2 rounded-lg hover:bg-gray-700/50"
+                                    :class="step.show ? 'text-cyan-300' : 'text-gray-400'">
+                                    <span class="mr-3 w-8 h-8 rounded-full flex items-center justify-center border text-sm transition-colors"
+                                        :class="step.show ? 'border-cyan-400 bg-cyan-900/30 text-cyan-300' : 'border-gray-600 text-gray-500 group-hover:border-gray-400'">
+                                        {{ sIdx + 1 }}
+                                    </span>
+                                    <span class="text-base">{{ step.label }}</span>
+                                    <span class="ml-auto text-xs opacity-50 transform transition-transform" :class="{'rotate-180': step.show}">▼</span>
+                                </button>
+                                
+                                <transition name="fade">
+                                    <div v-if="step.show" class="ml-11 mt-2 p-4 bg-gray-900/80 rounded-lg border-l-2 border-cyan-500/50 text-gray-300 text-base render-math-content shadow-inner">
+                                        <div v-html="step.content"></div>
+                                        <div v-if="step.note" class="mt-3 pt-3 border-t border-gray-800 text-sm text-yellow-500/90 italic flex items-start">
+                                            <span class="mr-2">💡</span>
+                                            <span>{{ step.note }}</span>
+                                        </div>
+                                    </div>
+                                </transition>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-3" class="glass-card p-6 sm:p-8">
+                <div class="flex flex-col mb-8">
+                    <h2 class="text-2xl font-bold border-l-4 border-yellow-500 pl-4 text-white">实战演练：当堂检测</h2>
+                    <p class="text-gray-400 text-sm mt-2 pl-5">请拿出草稿纸，完成以下练习。</p>
+                </div>
+                
+                <div class="flex flex-col space-y-8">
+                    <div v-for="(quiz, index) in quizzes" :key="index" class="bg-gray-800/60 rounded-xl p-6 border border-gray-700 hover:border-yellow-500/30 transition shadow-lg">
+                        
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="text-sm font-mono text-yellow-500/80 font-bold uppercase tracking-widest">Exercise {{ index + 1 }}</span>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold border" 
+                                :class="{
+                                    'bg-blue-900/30 border-blue-700 text-blue-300': quiz.difficulty==='基础',
+                                    'bg-purple-900/30 border-purple-700 text-purple-300': quiz.difficulty==='进阶',
+                                    'bg-red-900/30 border-red-700 text-red-300': quiz.difficulty==='技巧'
+                                }">
+                                {{ quiz.difficulty }}
+                            </span>
+                        </div>
+
+                        <div class="text-xl text-white mb-6 leading-relaxed render-math-content" v-html="quiz.question"></div>
+                        
+                        <div class="flex gap-4">
+                            <button @click="toggleQuizState(quiz, 'hint')" 
+                                class="px-4 py-2 text-sm border border-gray-600 rounded-lg hover:bg-gray-700 text-gray-300 transition w-32 text-center">
+                                {{ quiz.showHint ? '隐藏提示' : '💡一点提示' }}
+                            </button>
+                            <button @click="toggleQuizState(quiz, 'answer')" 
+                                class="px-4 py-2 text-sm bg-cyan-700/20 border border-cyan-500/50 rounded-lg hover:bg-cyan-700/40 text-cyan-300 transition w-32 text-center font-bold">
+                                {{ quiz.showAnswer ? '隐藏解析' : '查看完整解析' }}
+                            </button>
+                        </div>
+
+                        <transition name="fade">
+                            <div v-if="quiz.showHint" class="mt-4 bg-blue-900/20 p-4 rounded-lg border border-blue-500/20 text-blue-200 text-sm render-math-content">
+                                <strong>提示思路：</strong> {{ quiz.hint }}
+                            </div>
+                        </transition>
+                        
+                        <transition name="fade">
+                            <div v-if="quiz.showAnswer" class="mt-4 bg-green-900/10 p-5 rounded-lg border border-green-500/30 text-gray-200 render-math-content">
+                                <div class="font-bold text-green-400 mb-2 border-b border-green-500/20 pb-2">参考解析</div>
+                                <div v-html="quiz.answer" class="leading-relaxed space-y-2"></div>
+                            </div>
+                        </transition>
+
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="border-t border-gray-800 py-8 text-center text-gray-500 text-sm bg-gray-900">
+        <p>Mathematics Public Lesson · Chaos Theory & Sequence Iteration</p>
+        <p class="mt-2 opacity-50">Designed for Educational Purpose</p>
+    </footer>
+</div>
+
+<script>
+    const { createApp, ref, reactive, onMounted, watch, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            const mobileMenuOpen = ref(false);
+            const activeSection = ref(0);
+            const cobwebCanvas = ref(null);
+
+            const sections = [
+                { title: '理论基础' },
+                { title: '几何直观' },
+                { title: '典例精讲' },
+                { title: '实战演练' }
+            ];
+
+            const cobwebConfig = reactive({
+                type: 'logistic',
+                r: 3.2, 
+                a: 0.5,
+                x0: 0.1
+            });
+
+            // 核心功能：刷新 MathJax/KaTeX 渲染
+            const refreshMath = () => {
+                nextTick(() => {
+                    renderMathInElement(document.body, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ],
+                        throwOnError: false
+                    });
+                });
+            };
+
+            const toggleStep = (step) => {
+                step.show = !step.show;
+                if(step.show) refreshMath();
+            };
+
+            const toggleQuizState = (quiz, type) => {
+                if(type === 'hint') quiz.showHint = !quiz.showHint;
+                if(type === 'answer') quiz.showAnswer = !quiz.showAnswer;
+                refreshMath();
+            };
+
+            // 数据
+            const examples = reactive([
+                {
+                    title: "例题 1：双不动点型",
+                    badge: "必考",
+                    badgeClass: "bg-blue-600 text-white",
+                    problem: "已知数列 $a_1 = 2$，且 $a_{n+1} = \\frac{2a_n + 3}{a_n + 4}$。求 $a_n$。",
+                    steps: [
+                        { show: false, label: "第一步：求不动点", content: "令 $x = \\frac{2x+3}{x+4}$，整理得 $x^2+2x-3=0$。<br>解得两个不动点：$x_1=1, x_2=-3$。", note: "若两根相等，则需改用倒数法构造等差数列。" },
+                        { show: false, label: "第二步：构造辅助数列", content: "构造 $b_n = \\frac{a_n - x_1}{a_n - x_2} = \\frac{a_n - 1}{a_n + 3}$。<br>验证：$b_{n+1} = \\frac{a_{n+1}-1}{a_{n+1}+3} = \\dots = \\frac{1}{5}b_n$。", note: "通分过程要仔细，分子分母约分后即得公比。" },
+                        { show: false, label: "第三步：求解通项", content: "$b_1 = \\frac{a_1-1}{a_1+3} = \\frac{1}{5}$，故 $b_n = (\\frac{1}{5})^n$。<br>反解 $a_n$ 得：$a_n = \\frac{1+3(1/5)^n}{1-(1/5)^n} = \\frac{5^n+3}{5^n-1}$。" }
+                    ]
+                },
+                {
+                    title: "例题 2：牛顿迭代 (快速收敛)",
+                    badge: "高能",
+                    badgeClass: "bg-green-600 text-white",
+                    problem: "已知 $a_{n+1} = \\frac{a_n^2 + 3}{2a_n}$，$a_1 = 2$。证明数列收敛于 $\\sqrt{3}$。",
+                    steps: [
+                        { show: false, label: "第一步：识别结构", content: "变形为 $a_{n+1} = \\frac{1}{2}(a_n + \\frac{3}{a_n})$，这是求 $\\sqrt{3}$ 的牛顿迭代公式。", note: "此模型对应函数 $f(x)=x^2-3$ 的切线迭代。" },
+                        { show: false, label: "第二步：构造差比", content: "构造 $b_n = \\frac{a_n - \\sqrt{3}}{a_n + \\sqrt{3}}$。<br>推导得 $b_{n+1} = \\frac{(a_n-\\sqrt{3})^2}{(a_n+\\sqrt{3})^2} = b_n^2$。", note: "注意这里的指数变成了平方，收敛速度极快。" },
+                        { show: false, label: "第三步：分析极限", content: "$b_n = b_1^{2^{n-1}}$。因 $|b_1| = |\\frac{2-\\sqrt{3}}{2+\\sqrt{3}}| < 1$，故 $n \\to \\infty$ 时 $b_n \\to 0$，从而 $a_n \\to \\sqrt{3}$。" }
+                    ]
+                }
+            ]);
+
+            const quizzes = reactive([
+                {
+                    question: "已知 $a_{n+1} = \\frac{3a_n - 4}{a_n - 2}$，$a_1 = 3$。求 $a_n$ 的通项公式。",
+                    difficulty: "基础",
+                    showHint: false, showAnswer: false,
+                    hint: "求不动点方程 $x = \\frac{3x-4}{x-2}$，解出 $x$ 的值。如果是两个不同的根，构造分式等比数列。",
+                    answer: "1. 解不动点方程 $x^2-5x+4=0$，得 $x_1=1, x_2=4$。<br>2. 构造 $b_n = \\frac{a_n-4}{a_n-1}$。<br>3. 验证 $\\frac{b_{n+1}}{b_n} = -1$，故 $b_n$ 是公比为 $-1$ 的等比数列。<br>4. 最终结果：$a_n = \\frac{4-(-1)^n}{1-2(-1)^n}$ (形式可化简)。"
+                },
+                {
+                    question: "已知 $a_{n+1} = 2 - \\frac{1}{a_n}$，$a_1 = 4$。求 $\\lim_{n\\to\\infty} a_n$。",
+                    difficulty: "进阶",
+                    showHint: false, showAnswer: false,
+                    hint: "计算不动点，你会发现这是一个重根 $(x-1)^2=0$。此时常规分式构造失效，需要使用倒数法。",
+                    answer: "1. 不动点 $x=1$ (重根)。<br>2. 令 $b_n = \\frac{1}{a_n-1}$。<br>3. 代入化简可得 $b_{n+1} = b_n + 1$ (公差为1的等差数列)。<br>4. $b_n \\to +\\infty$，故分母 $a_n-1 \\to 0$，所以 $a_n \\to 1$。"
+                },
+                {
+                    question: "已知 $a_{n+1} = 4a_n^3 - 3a_n$，$a_1 = 0.5$。求 $a_n$。",
+                    difficulty: "技巧",
+                    showHint: false, showAnswer: false,
+                    hint: "看到 $4x^3-3x$ 这个结构，联想三角恒等式 $\\cos 3\\theta = 4\\cos^3\\theta - 3\\cos\\theta$。注意 $a_1$ 是否在 $[-1,1]$ 内。",
+                    answer: "1. 令 $a_1 = \\frac{1}{2} = \\cos(\\frac{\\pi}{3})$。<br>2. 根据递推式，角变成了 3 倍：$a_2 = \\cos(\\pi), a_3 = \\cos(3\\pi) \\dots$<br>3. 通项：$a_n = \\cos(3^{n-1} \\cdot \\frac{\\pi}{3})$。"
+                }
+            ]);
+
+            const scrollTo = (index) => {
+                document.getElementById(`section-${index}`)?.scrollIntoView({ behavior: 'smooth' });
+                activeSection.value = index;
+            };
+
+            // 绘图逻辑
+            const drawCobweb = () => {
+                const canvas = cobwebCanvas.value;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const w = canvas.width, h = canvas.height;
+                ctx.clearRect(0,0,w,h);
+
+                let minX=0, maxX=1, minY=0, maxY=1;
+                if (cobwebConfig.type === 'newton') { maxX=5; maxY=5; }
+                if (cobwebConfig.type === 'linear') { maxX=2; maxY=2; minX=-1; minY=-1; }
+                
+                const toSx = x => (x - minX)/(maxX - minX)*w;
+                const toSy = y => h - (y - minY)/(maxY - minY)*h;
+
+                // 轴
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(toSx(minX), toSy(minX)); ctx.lineTo(toSx(maxX), toSy(maxX)); ctx.stroke();
+                
+                // y=x
+                ctx.strokeStyle = '#555'; ctx.setLineDash([5,5]);
+                ctx.beginPath(); ctx.moveTo(toSx(minX), toSy(minX)); ctx.lineTo(toSx(maxX), toSy(maxX)); ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 曲线
+                ctx.strokeStyle = '#00f3ff'; ctx.lineWidth = 3;
+                ctx.beginPath();
+                for(let px=0; px<=w; px+=2) {
+                    const x = minX + (px/w)*(maxX-minX);
+                    let y = 0;
+                    if(cobwebConfig.type === 'logistic') y = cobwebConfig.r * x * (1-x);
+                    else if(cobwebConfig.type === 'linear') y = cobwebConfig.a * x + 0.5;
+                    else if(cobwebConfig.type === 'newton') y = x!==0 ? 0.5*(x+3/x) : 0;
+                    
+                    if(px===0) ctx.moveTo(toSx(x), toSy(y));
+                    else ctx.lineTo(toSx(x), toSy(y));
+                }
+                ctx.stroke();
+
+                // 蛛网
+                ctx.strokeStyle = '#bc13fe'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                let cx = cobwebConfig.x0, cy = 0;
+                ctx.moveTo(toSx(cx), toSy(0));
+                
+                for(let i=0; i<80; i++) {
+                    if(cobwebConfig.type === 'logistic') cy = cobwebConfig.r * cx * (1-cx);
+                    else if(cobwebConfig.type === 'linear') cy = cobwebConfig.a * cx + 0.5;
+                    else if(cobwebConfig.type === 'newton') cy = cx!==0 ? 0.5*(cx+3/cx) : 0;
+
+                    ctx.lineTo(toSx(cx), toSy(cy));
+                    ctx.lineTo(toSx(cy), toSy(cy));
+                    cx = cy;
+                    if(Math.abs(cx) > 100 || isNaN(cx)) break;
+                }
+                ctx.stroke();
+                
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(toSx(cx), toSy(cx), 5, 0, Math.PI*2); ctx.fill();
+            };
+
+            const resetCobweb = () => {
+                if (cobwebConfig.type === 'logistic') { cobwebConfig.r=3.2; cobwebConfig.x0=0.1; }
+                else if (cobwebConfig.type === 'newton') { cobwebConfig.x0=4; }
+                drawCobweb();
+            };
+
+            onMounted(() => {
+                nextTick(() => {
+                    drawCobweb();
+                    refreshMath(); // 初始渲染数学公式
+                });
+                window.addEventListener('resize', drawCobweb);
+            });
+            
+            watch(cobwebConfig, drawCobweb, { deep: true });
+
+            return { 
+                mobileMenuOpen, activeSection, sections, scrollTo, 
+                cobwebCanvas, cobwebConfig, resetCobweb, 
+                examples, quizzes, 
+                toggleStep, toggleQuizState 
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
